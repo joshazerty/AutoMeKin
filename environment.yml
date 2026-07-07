@@ -1,0 +1,20 @@
+name: automekin-spin-aware
+# Conda environment for the spin-aware AutoMeKin pipeline (Project 18).
+# External QM engines (Gaussian 16 A.03, ORCA 6.1) are NOT conda-installable and
+# must be provided separately; versions used in the paper are pinned in comments.
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - scipy
+  - networkx
+  - ase
+  - xtb=6.7.1            # GFN2-xTB exploration engine
+  - pip
+  - pip:
+      - easymecp==0.3.2  # Harvey MECP.x wrapper (Gaussian)
+# External (not conda):
+#   Gaussian 16 rev. A.03   — DFT refinement, MECP single points
+#   ORCA 6.1                — CASSCF/QDPT-SOMF spin-orbit coupling
+#   pyscf 2.13.0            — SA-CASSCF(7,5)+SC-NEVPT2 crossing map (optional; used on the Fe(I) case)
