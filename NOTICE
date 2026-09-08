@@ -1,0 +1,85 @@
+NOTICE
+======
+
+spin-aware-amk — spin-resolved automated reaction-network exploration with automatic
+minimum-energy-crossing-point (MECP) localisation.
+
+Copyright (c) 2026 Joshua Sims and Jeremy N. Harvey
+KU Leuven, Department of Chemistry.
+Released under the MIT License (see LICENSE).
+
+This work is a DERIVATIVE of, and redistributes code from, the following upstream projects.
+Each remains under its own licence and copyright; this NOTICE does not supersede them.
+
+--------------------------------------------------------------------------------
+1. AutoMeKin  (upstream host program — code redistributed and modified)
+--------------------------------------------------------------------------------
+   Copyright (C) 2021 AutoMeKin developers.  Licence: MIT.
+   Source:  https://github.com/emartineznunez/AutoMeKin
+   Archive: https://doi.org/10.5281/zenodo.12564112
+   Citation: E. Martinez-Nunez, G. L. Barnes, D. R. Glowacki, S. Kopec, D. Pelaez,
+             A. Rodriguez, R. Rodriguez-Fernandez, R. J. Shannon, J. J. P. Stewart,
+             P. G. Tahoces, S. A. Vazquez, "AutoMeKin2021: An open-source program for
+             automated reaction discovery", J. Comput. Chem. 2021, 42, 2036-2048.
+             DOI 10.1002/jcc.26734
+
+   Modifications made by this project are enumerated in CHANGES_vs_upstream.md.
+
+--------------------------------------------------------------------------------
+2. MECP algorithm  (method + reference Fortran implementation)
+--------------------------------------------------------------------------------
+   Original algorithm and code by Jeremy N. Harvey.
+   Citation: J. N. Harvey, M. Aschi, H. Schwarz, W. Koch, "The singlet and triplet states
+             of phenyl cation. A hybrid approach for locating minimum energy crossing
+             points between non-interacting potential energy surfaces",
+             Theor. Chem. Acc. 1998, 99, 95-99.  DOI 10.1007/s002140050309
+
+--------------------------------------------------------------------------------
+3. easyMECP  (Python driver wrapping the Harvey MECP Fortran code)
+--------------------------------------------------------------------------------
+   Copyright (c) Jaime Rodriguez-Guerra.  Licence: MIT.
+   Source: https://github.com/jaimergp/easymecp
+   Used here as an external dependency (invoked, version 0.3.2); its source is NOT
+   redistributed in this repository.
+
+--------------------------------------------------------------------------------
+4. MOPAC  (low-level semiempirical engine used by stock AutoMeKin)
+--------------------------------------------------------------------------------
+   Copyright (c) James J. P. Stewart / Stewart Computational Chemistry.
+   Licence: Apache-2.0 (current open-source release).
+   Source: https://github.com/openmopac/mopac
+   Invoked as an external binary; not redistributed here. The `MOPACamk` calculator
+   pattern in stock AutoMeKin is the model for this project's `XTBamk` calculator.
+
+--------------------------------------------------------------------------------
+5. xtb / GFN2-xTB  (low-level engine added by this project)
+--------------------------------------------------------------------------------
+   Copyright (c) Grimme group, University of Bonn.  Licence: LGPL-3.0.
+   Source: https://github.com/grimme-lab/xtb
+   Citation: C. Bannwarth, S. Ehlert, S. Grimme, J. Chem. Theory Comput. 2019, 15,
+             1652-1671.  DOI 10.1021/acs.jctc.8b01176
+   Invoked as an external binary; not redistributed here.
+
+--------------------------------------------------------------------------------
+6. ASE — Atomic Simulation Environment  (dependency)
+--------------------------------------------------------------------------------
+   Licence: LGPL-2.1-or-later (per the PyPI license_expression metadata for ase 3.29.0;
+   re-confirm against the upstream COPYING file before release).
+   https://gitlab.com/ase/ase
+   Citation: A. Hjorth Larsen et al., J. Phys.: Condens. Matter 2017, 29, 273002.
+             DOI 10.1088/1361-648X/aa680e
+
+--------------------------------------------------------------------------------
+7. Sella  (saddle-point optimiser used for TS refinement)
+--------------------------------------------------------------------------------
+   Copyright 2019 National Technology & Engineering Solutions of Sandia, LLC (NTESS).
+   Licence: LGPL-3.0.  https://github.com/zadorlab/sella
+   Citation: E. D. Hermes, K. Sargsyan, H. N. Najm, J. Zador, J. Chem. Theory Comput.
+             2022, 18, 6974-6988.  DOI 10.1021/acs.jctc.2c00395
+
+--------------------------------------------------------------------------------
+Third-party quantum-chemistry packages used to PRODUCE results reported in the
+accompanying paper, but neither redistributed nor wrapped by this code:
+Gaussian 16 (Gaussian, Inc. — commercial) and ORCA 6.1 (FAccTs GmbH / MPI KOFO —
+free for academic use under its own EULA).
+--------------------------------------------------------------------------------

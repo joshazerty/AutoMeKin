@@ -1,0 +1,55 @@
+{
+  "title": "spin-aware-amk v1.0.0: spin-resolved automated reaction networks with automatic MECP localisation — code and supporting data",
+  "upload_type": "software",
+  "license": "MIT",
+  "version": "1.0.0",
+  "creators": [
+    {
+      "name": "Sims, Joshua",
+      "affiliation": "KU Leuven, Department of Chemistry",
+      "orcid": "0000-0002-8279-3010"
+    },
+    {
+      "name": "Harvey, Jeremy N.",
+      "affiliation": "KU Leuven, Department of Chemistry"
+    }
+  ],
+  "description": "Spin-resolved extension of the AutoMeKin chemical-reaction-network engine: a spin-capable GFN2-xTB exploration engine, automatic enumeration of close-lying spin states (M1), automatic minimum-energy-crossing-point localisation at flagged crossings (M2), MECP nodes with non-adiabatic edges in the reaction graph (M3), nonadiabatic transition-state-theory rates and microkinetic post-analysis (M4), and a multireference diagnostic gate (M0) that decides from the expectation value of the total spin operator whether a node is single-reference-clean before single-determinant methods are applied to it. Supporting code for the accompanying methods paper. This record archives the released code together with the supporting data of the accompanying methods paper: the worked validation and blind-exploration runs, the gate evidence logs for all three reported verdicts, the MECP localisations, the single-point energetics, the CASSCF/NEVPT2 and spin-orbit outputs, the nonadiabatic rate inputs, and the source data behind every figure. See README.md for the file-by-file mapping onto the sections of the paper.",
+  "keywords": [
+    "automated reaction discovery",
+    "minimum-energy crossing point",
+    "spin-forbidden reactivity",
+    "transition-metal catalysis",
+    "multireference diagnostics",
+    "AutoMeKin"
+  ],
+  "related_identifiers": [
+    {
+      "relation": "isDerivedFrom",
+      "identifier": "10.5281/zenodo.12564112",
+      "scheme": "doi",
+      "resource_type": "software"
+    },
+    {
+      "relation": "isSupplementTo",
+      "identifier": "https://github.com/joshazerty/AutoMeKin/tree/v1.0.0",
+      "scheme": "url",
+      "resource_type": "software"
+    },
+    {
+      "relation": "cites",
+      "identifier": "10.1002/jcc.26734",
+      "scheme": "doi",
+      "resource_type": "publication-article"
+    },
+    {
+      "relation": "cites",
+      "identifier": "10.1007/s002140050309",
+      "scheme": "doi",
+      "resource_type": "publication-article"
+    }
+  ],
+  "access_right": "open",
+  "language": "eng",
+  "notes": "Supported by Internal Funds KU Leuven, grant iBOF/25/022. Calculations used the KU Leuven 'dirac' cluster and the Flemish Supercomputer Centre (VSC), funded by the Research Foundation - Flanders (FWO) and the Flemish Government."
+}

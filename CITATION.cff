@@ -1,37 +1,35 @@
 cff-version: 1.2.0
+title: "spin-aware-amk: spin-resolved automated reaction networks with automatic MECP localisation"
+message: "If you use this software, please cite both the software and the methods paper."
+type: software
 authors:
-- family-names: "Martinez-Nunez"
-  given-names: "Emilio"
-- family-names: "Barnes"
-  given-names: "George L."
-- family-names: "Bo"
-  given-names: "Carles"
-- family-names: "Fernández-Ramos"
-  given-names: "Antonio"
-- family-names: "Ferro-Costas"
-  given-names: "David"
-- family-names: "Garay-Ruiz"
-  given-names: "Diego"
-- family-names: "Glowacki"
-  given-names: "David R."
-- family-names: "Kopec"
-  given-names: "Sabine"
-- family-names: "Pelaez-Ruiz"
-  given-names: "Daniel"
-- family-names: "Rodriguez"
-  given-names: "Aurelio"
-- family-names: "Rodriguez-Fernandez"
-  given-names: "Roberto"
-- family-names: "Shannon"
-  given-names: "Robin J."
-- family-names: "Stewart"
-  given-names: "Jameas J.P."
-- family-names: "Tahoces"
-  given-names: "Pablo G."
-- family-names: "Vazquez"
-  given-names: "Saulo A."
-title: "AutoMeKin"
-version: 2021rev1137
-url: "https://github.com/emartineznunez/AutoMeKin"
-date-released: 2024-02-17
-doi: 10.5281/zenodo.10674958
+  - given-names: Joshua
+    family-names: Sims
+    affiliation: "KU Leuven, Department of Chemistry"
+    orcid: "https://orcid.org/0000-0002-8279-3010"
+  - given-names: "Jeremy N."
+    family-names: Harvey
+    affiliation: "KU Leuven, Department of Chemistry"
+license: MIT
+repository-code: "https://github.com/joshazerty/AutoMeKin"
+url: "https://github.com/joshazerty/AutoMeKin/tree/spin-aware-release"
+version: "1.0.0"
+date-released: "2026-09-08"
+# Uncomment and fill once the Zenodo deposit is published; leaving the key out is valid CFF,
+# leaving it in with placeholder text is not.
+# doi: "10.5281/zenodo.NNNNNNN"
+preferred-citation:
+  type: article
+  title: "Spin-Resolved Reaction-Network Exploration in AutoMeKin: Automatic Minimum-Energy-Crossing-Point Localisation and a Multireference Diagnostic Gate"
+  authors:
+    - given-names: Joshua
+      family-names: Sims
+      orcid: "https://orcid.org/0000-0002-8279-3010"
+  year: 2026
+  journal: "J. Comput. Chem."
+  notes: "Submitted. Update volume, pages and DOI on acceptance."
+references:
+  - type: software
+    title: "AutoMeKin"
+    doi: "10.5281/zenodo.12564112"
+    notes: "Upstream CRN engine extended by this project (MIT)."
