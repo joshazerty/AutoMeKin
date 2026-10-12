@@ -121,6 +121,56 @@ def read_easymecp_geom(geom_path):
     return rows
 
 
+def read_last_trajectory_frame(traj_path):
+    """easyMECP appends each accepted step to JOBS/trajectory.xyz as a standard xyz
+    frame (natoms / 'Step N' / coords). Return the rows of the LAST frame. Used as the
+    converged-geometry source when MECP.x did not (re)write a standalone `geom` file
+    (e.g. immediate step-0 convergence)."""
+    with open(traj_path) as fh:
+        lines = fh.read().splitlines()
+    rows, i = [], 0
+    while i < len(lines):
+        try:
+            n = int(lines[i].split()[0])
+        except (ValueError, IndexError):
+            i += 1
+            continue
+        frame = []
+        for ln in lines[i + 2:i + 2 + n]:
+            p = ln.split()
+            if len(p) >= 4:
+                try:
+                    frame.append((p[0], float(p[1]), float(p[2]), float(p[3])))
+                except ValueError:
+                    pass
+        if len(frame) == n:
+            rows = frame
+        i += 2 + n
+    return rows
+
+
+def _final_step_logs(workdir):
+    """Return [A.log, B.log] for the highest-numbered easyMECP step.
+
+    easyMECP 0.3.2 writes per-step Gaussian logs as JOBS/Job<step>_A.log /
+    JOBS/Job<step>_B.log. Fall back to legacy A.log/B.log, then to the two
+    most-recently-modified *.log under workdir or JOBS."""
+    jobs = os.path.join(workdir, "JOBS")
+    def _step(path):
+        m = re.search(r"Job(\d+)_[AB]\.log$", os.path.basename(path))
+        return int(m.group(1)) if m else -1
+    a = sorted(glob.glob(os.path.join(jobs, "Job*_A.log")), key=_step)
+    b = sorted(glob.glob(os.path.join(jobs, "Job*_B.log")), key=_step)
+    if a and b:
+        return [a[-1], b[-1]]
+    legacy = [os.path.join(workdir, f"{t}.log") for t in ("A", "B")]
+    if all(os.path.isfile(p) for p in legacy):
+        return legacy
+    alllogs = sorted(glob.glob(os.path.join(workdir, "*.log")) +
+                     glob.glob(os.path.join(jobs, "*.log")), key=os.path.getmtime)
+    return alllogs[-2:] if len(alllogs) >= 2 else []
+
+
 def write_xyz(rows, path, comment=""):
     with open(path, "w") as fh:
         fh.write(f"{len(rows)}\n{comment}\n")
@@ -137,23 +187,20 @@ def collect_result(workdir):
     res = {"workdir": os.path.abspath(workdir), "converged": None,
            "e_surface_a": None, "e_surface_b": None, "gap_kcal": None, "crossing_e_eh": None,
            "n_geom_atoms": None, "report_tail": None}
-    # geometry
+    # geometry: MECP.x's `geom` file if present, else the last frame of the trajectory
+    # (covers immediate step-0 convergence, where no standalone `geom` is rewritten).
     geom = os.path.join(workdir, "geom")
+    traj = os.path.join(workdir, "JOBS", "trajectory.xyz")
+    rows = []
     if os.path.isfile(geom):
         rows = read_easymecp_geom(geom)
-        if rows:
-            write_xyz(rows, os.path.join(workdir, "mecp.xyz"), "MECP (easyMECP converged)")
-            res["n_geom_atoms"] = len(rows)
-    # energies: A.log / B.log, else two newest logs
-    logs = []
-    for tag in ("A", "B"):
-        for cand in (f"{tag}.log", os.path.join("JOBS", f"{tag}.log")):
-            p = os.path.join(workdir, cand)
-            if os.path.isfile(p):
-                logs.append(p); break
-    if len(logs) < 2:
-        logs = sorted(glob.glob(os.path.join(workdir, "*.log")),
-                      key=os.path.getmtime)[-2:]
+    if not rows and os.path.isfile(traj):
+        rows = read_last_trajectory_frame(traj)
+    if rows:
+        write_xyz(rows, os.path.join(workdir, "mecp.xyz"), "MECP (easyMECP converged)")
+        res["n_geom_atoms"] = len(rows)
+    # energies: the two final-step Gaussian logs (JOBS/Job<N>_{A,B}.log)
+    logs = _final_step_logs(workdir)
     energies = [parse_scf_done(p) for p in logs] if len(logs) >= 2 else []
     energies = [e for e in energies if e is not None]
     if len(energies) == 2:
@@ -210,6 +257,9 @@ def main():
     sub("--method", default="UB3LYP")
     sub("--basis", default="def2SVP")
     sub("--max-steps", type=int, default=80)
+    sub("--nproc", type=int, default=8, help="nproc written into system.gjf (used by every easyMECP step)")
+    sub("--mem", default="16GB", help="mem written into system.gjf")
+    sub("--extra-route", default="", help="extra Gaussian route keywords (e.g. 'Int=UltraFine SCF=(XQC,MaxCycle=300)')")
     sub("--dry-run", action="store_true", help="generate inputs only; do not run Gaussian")
     sub("--selftest", action="store_true")
     args = ap.parse_args()
@@ -231,7 +281,8 @@ def main():
     for r in runs:
         rec = locate_one(easymecp=args.easymecp, gaussian_exe=args.gaussian_exe,
                          method=args.method, basis=args.basis, max_steps=args.max_steps,
-                         dry_run=args.dry_run, **r)
+                         mem=args.mem, nproc=args.nproc,
+                         extra_route=args.extra_route, dry_run=args.dry_run, **r)
         print(json.dumps({k: rec.get(k) for k in
                           ("workdir", "returncode", "converged", "gap_kcal",
                            "crossing_e_eh", "n_geom_atoms")}, indent=2))
@@ -255,7 +306,21 @@ def _selftest():
         open(g, "w").write("26 0.0 0.0 0.0\n6 0.0 0.0 1.8\n8 0.0 0.0 2.95\n")
         gr = read_easymecp_geom(g)
         assert gr[0][0] == "Fe" and gr[2][0] == "O" and len(gr) == 3
-    print("M2 selftest PASS: gjf generation, SCF parse, geom(Z->sym) read all OK")
+        # 4) easyMECP 0.3.2 layout: highest-numbered JOBS/Job<N>_{A,B}.log win,
+        #    and the geometry falls back to the last trajectory frame when `geom` is absent
+        w = os.path.join(d, "run"); os.makedirs(os.path.join(w, "JOBS"))
+        for n, ea, eb in ((0, -1.0, -1.01), (2, -1.2, -1.2001), (10, -1.3, -1.30001)):
+            for t, e in (("A", ea), ("B", eb)):
+                open(os.path.join(w, "JOBS", f"Job{n}_{t}.log"), "w").write(
+                    f" SCF Done:  E(UB3LYP) =  {e:.6f} A.U. after 9 cycles\n")
+        assert [os.path.basename(p) for p in _final_step_logs(w)] == ["Job10_A.log", "Job10_B.log"]
+        open(os.path.join(w, "JOBS", "trajectory.xyz"), "w").write(
+            "2\nStep 0\nFe 0 0 0\nC 0 0 1.9\n2\nStep 1\nFe 0 0 0\nC 0 0 2.3\n")
+        res = collect_result(w)
+        assert res["n_geom_atoms"] == 2 and abs(res["e_surface_a"] + 1.3) < 1e-9
+        assert read_xyz(os.path.join(w, "mecp.xyz"))[1][3] == 2.3
+    print("M2 selftest PASS: gjf generation, SCF parse, geom(Z->sym) read, "
+          "final-step log selection, trajectory fallback all OK")
     return 0
 
 

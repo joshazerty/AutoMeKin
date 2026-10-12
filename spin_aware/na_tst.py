@@ -77,7 +77,7 @@ def kappa(T, H_SO_cm, dF_eh_bohr, mu_amu, passage="double", n=4000):
     # integrate E_perp from ~0 to 60 kT
     E = np.linspace(1e-6 * kT, 60.0 * kT, n)
     integrand = p_hop(E, H_SO_J, dF_N, mu_kg, passage) * np.exp(-E / kT)
-    trapz = getattr(np, "trapezoid", np.trapz)
+    trapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz   # NumPy >= 2 removed trapz
     return float(trapz(integrand, E) / kT)
 
 

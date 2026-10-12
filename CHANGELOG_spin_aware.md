@@ -1,3 +1,11 @@
+## spin_aware 0.2.0 (unreleased; manuscript revision)
+
+| Date | Changes |
+| ---------- | ----------|
+|10/12/2026| New M1 modules <code>dissociation_scan.py</code> (GFN2 relaxed metal–ligand scans per multiplicity; flags crossings on ligand-loss channels, which have no saddle point) and <code>dissociation_seed_dft.py</code> (DFT single points on the scan frames; seed at the DFT crossing; batch <code>--from-candidates</code>, <code>--reuse-only</code>). Output is M1 candidate schema, consumed unchanged by <code>locate_mecp.py</code>. Worked case <code>spin_aware/examples/feco5_co_loss/</code>.|
+|10/12/2026| <code>locate_mecp.py</code>: CLI options <code>--nproc</code>, <code>--mem</code>, <code>--extra-route</code> (previously only in the Python API); result collection reads the final-step easyMECP 0.3.2 logs <code>JOBS/Job&lt;N&gt;_{A,B}.log</code> and falls back to the last frame of <code>JOBS/trajectory.xyz</code> when no <code>geom</code> file is written. This is the version used for the Tp-Fe def2-TZVP and Fe(CO)5 MECP runs.|
+|10/12/2026| <code>na_tst.py</code>: the <code>trapz</code> fallback evaluated <code>np.trapz</code> eagerly and failed to import under NumPy 2; <code>na_tst</code> and <code>annotate_rates</code> now run on NumPy 1.x and 2.x (numerics unchanged).|
+
 ## Revision number 1142 (September 26, 2024) 
 
 | Date | 	Changes |
