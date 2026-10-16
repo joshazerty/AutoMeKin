@@ -46,8 +46,11 @@ def read_frames(path):
     return out
 
 
-def gjf(rows, charge, mult, route, nproc, mem, title):
-    s = [f"%nprocshared={nproc}", f"%mem={mem}", f"#p {route} SCF=(XQC,MaxCycle=300) Int=UltraFine",
+def gjf(rows, charge, mult, route, nproc, mem, title, chk=None, guess_read=False):
+    """Gaussian input. chk: checkpoint name written by this single point; guess_read: start the SCF from
+    the orbitals in that checkpoint (left by the previous frame of the same surface)."""
+    s = [f"%nprocshared={nproc}", f"%mem={mem}"] + ([f"%chk={chk}"] if chk else []) + \
+        [f"#p {route} SCF=(XQC,MaxCycle=300) Int=UltraFine" + (" Guess=Read" if guess_read else ""),
          "", title, "", f"{charge} {mult}"]
     s += [f" {a:3s} {x: .8f} {y: .8f} {z: .8f}" for a, x, y, z in rows]
     return "\n".join(s) + "\n\n"
@@ -76,7 +79,7 @@ def crossing_and_seed(R, g):
 
 def run(scan_dir, tag, charge, base_mult, alt_mult, route, workdir, g16="g16",
         nproc=8, mem="8GB", every=1, out_json="mecp_candidates_dissoc_dft.json", dry=False,
-        scan_files=None, reuse_only=False, write_json=True):
+        scan_files=None, reuse_only=False, write_json=True, m2_window=30.0, guess_read=True):
     """Refine one channel. scan_files ({mult: path}) overrides scan_dir/tag lookup."""
     os.makedirs(workdir, exist_ok=True)
     if scan_files is None:
@@ -91,10 +94,19 @@ def run(scan_dir, tag, charge, base_mult, alt_mult, route, workdir, g16="g16",
             if not (os.path.isfile(stem+".log") and scf(stem+".log") is not None):
                 if reuse_only:
                     raise FileNotFoundError(f"--reuse-only: no completed log {stem}.log")
-                open(stem+".gjf", "w").write(gjf(rows, charge, mu, route, nproc, mem, f"{tag} r={r:.3f} mult {mu}"))
+                chk = f"sp_m{mu}.chk"          # one checkpoint per surface, overwritten frame by frame
+                title = f"{tag} r={r:.3f} mult {mu}"
+                use_guess = guess_read and k > 0 and os.path.isfile(os.path.join(workdir, chk))
+                open(stem+".gjf", "w").write(gjf(rows, charge, mu, route, nproc, mem, title,
+                                                 chk=chk if guess_read else None, guess_read=use_guess))
                 if not dry:
                     with open(stem+".gjf") as fi, open(stem+".log", "w") as fo:
                         subprocess.run([g16], stdin=fi, stdout=fo, stderr=subprocess.STDOUT, cwd=workdir)
+                    if use_guess and scf(stem+".log") is None:   # guess from the neighbouring frame failed: plain guess
+                        open(stem+".gjf", "w").write(gjf(rows, charge, mu, route, nproc, mem, title,
+                                                         chk=chk, guess_read=False))
+                        with open(stem+".gjf") as fi, open(stem+".log", "w") as fo:
+                            subprocess.run([g16], stdin=fi, stdout=fo, stderr=subprocess.STDOUT, cwd=workdir)
             E[mu].append(None if dry else scf(stem+".log"))
     if dry:
         return None
@@ -112,10 +124,14 @@ def run(scan_dir, tag, charge, base_mult, alt_mult, route, workdir, g16="g16",
             "E_alt_rel_kcal": np.round((ea-eb[0])*HARTREE_KCAL, 2).tolist(),
             "crossing_r_A": cross, "seed_index": k, "route": route}
     json.dump(prof, open(os.path.join(workdir, "dft_profile.json"), "w"), indent=1)
+    min_gap = float(np.nanmin(np.abs(g)))
     cand = {"node": f"{tag}_m{base_mult}to{alt_mult}_dft", "xyz": seed, "charge": charge,
             "base_mult": base_mult, "alt_mult": alt_mult, "dE_vert_kcal": round(float(g[k]), 2),
             "kind": "dissociation_channel", "seed_level": route, "r_seed_A": float(R[k]),
             "crossing_r_A": cross,
+            "min_abs_gap_dft_kcal": round(min_gap, 2),
+            "m2_eligible": bool(cross is not None or min_gap <= m2_window),
+            "m2_window_kcal": m2_window,
             "note": "DFT curves cross on ligand-loss channel" if cross is not None
                     else "no DFT crossing inside scan; seed at min |gap|"}
     if write_json:
@@ -125,7 +141,8 @@ def run(scan_dir, tag, charge, base_mult, alt_mult, route, workdir, g16="g16",
 
 
 def run_batch(cand_json, route, workdir, g16="g16", nproc=8, mem="8GB", every=1,
-              out_json="mecp_candidates_dissoc_dft.json", dry=False, reuse_only=False):
+              out_json="mecp_candidates_dissoc_dft.json", dry=False, reuse_only=False,
+              m2_window=30.0, eligible_out=None, guess_read=True):
     """Refine every candidate of a dissociation_scan.py JSON (one subdir per channel)."""
     cands = json.load(open(cand_json))["candidates"]
     out = []
@@ -138,7 +155,8 @@ def run_batch(cand_json, route, workdir, g16="g16", nproc=8, mem="8GB", every=1,
         tag = c.get("scan_tag") or c["node"].rsplit("_m", 1)[0]
         res = run(None, tag, c["charge"], b, a, route,
                   os.path.join(workdir, f"{tag}_m{b}to{a}"), g16, nproc, mem, every,
-                  out_json, dry, scan_files=sf, reuse_only=reuse_only, write_json=False)
+                  out_json, dry, scan_files=sf, reuse_only=reuse_only, write_json=False,
+                  m2_window=m2_window, guess_read=guess_read)
         if res is not None:
             res["channel"] = c.get("channel")
             out.append(res)
@@ -146,6 +164,11 @@ def run_batch(cand_json, route, workdir, g16="g16", nproc=8, mem="8GB", every=1,
         json.dump({"stage": "M1-dissociation-dft", "route": route, "candidates": out},
                   open(out_json, "w"), indent=2)
         print(f"{len(out)} DFT-refined dissociation seed(s) -> {out_json}")
+        if eligible_out:       # only seeds that pass the M2 rule: DFT curves cross or min |gap| <= m2_window
+            el = [c for c in out if c["m2_eligible"]]
+            json.dump({"stage": "M1-dissociation-dft", "route": route, "candidates": el},
+                      open(eligible_out, "w"), indent=2)
+            print(f"{len(el)} of {len(out)} seed(s) eligible for M2 (DFT crossing or min |gap| <= {m2_window} kcal/mol) -> {eligible_out}")
     return out
 
 
@@ -181,6 +204,22 @@ def _selftest():
         assert c["crossing_r_A"] is not None and 2.0 < c["crossing_r_A"] < 2.2, c
         assert abs(c["r_seed_A"] - 2.2) < 1e-9 and c["dE_vert_kcal"] == -1.0, c   # |-1| < |2|
         assert json.load(open(os.path.join(d, "o.json")))["candidates"][0]["node"] == "t_m1to3_dft"
+        assert c["m2_eligible"] is True and c["min_abs_gap_dft_kcal"] == 1.0, c
+        # M2 rule: no crossing and min |gap| above the window -> not eligible; written file keeps only eligible seeds
+        far = [60.0, 55.0, 52.0, 53.0]
+        wd2 = os.path.join(d, "batch2", "t_m1to3"); os.makedirs(wd2)
+        for k, gp in enumerate(far):
+            for mu, e in ((1, -100.0), (3, -100.0 + gp/HARTREE_KCAL)):
+                open(os.path.join(wd2, f"sp_m{mu}_{k:02d}.log"), "w").write(
+                    f" SCF Done:  E(UB3LYP) =  {e:.10f}     A.U. after 10 cycles\n Normal termination of Gaussian 16\n")
+        eo = os.path.join(d, "elig.json")
+        out2 = run_batch(cj, "UB3LYP/def2SVP", os.path.join(d, "batch2"), out_json=os.path.join(d, "o2.json"),
+                         reuse_only=True, eligible_out=eo)
+        t = gjf([("Fe", 0.0, 0.0, 0.0)], 0, 3, "UB3LYP/def2SVP", 4, "4GB", "x", chk="sp_m3.chk", guess_read=True)
+        assert "%chk=sp_m3.chk" in t and "Guess=Read" in t and "XQC" in t
+        t0 = gjf([("Fe", 0.0, 0.0, 0.0)], 0, 3, "UB3LYP/def2SVP", 4, "4GB", "x"); assert "chk" not in t0 and "Guess" not in t0
+        assert out2[0]["m2_eligible"] is False and out2[0]["crossing_r_A"] is None, out2[0]
+        assert json.load(open(eo))["candidates"] == []
         # no sign change -> min |gap| frame, crossing None
         cr, k = crossing_and_seed(np.array(R), np.array([9.0, 5.0, 3.0, 4.0]))
         assert cr is None and k == 2
@@ -207,6 +246,12 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="write .gjf inputs only")
     ap.add_argument("--reuse-only", action="store_true",
                     help="never run Gaussian; fail if a single point is missing")
+    ap.add_argument("--m2-window", type=float, default=30.0,
+                    help="seed is eligible for M2 if the DFT curves cross or min |gap| <= this (kcal/mol)")
+    ap.add_argument("--eligible-out", help="batch: also write the M2-eligible seeds to this JSON")
+    ap.add_argument("--no-guess-read", action="store_true",
+                    help="start every single point from the default guess (default: reuse the orbitals of the "
+                         "previous frame of the same surface, with a fallback to the default guess)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -215,12 +260,13 @@ def main():
         ap.error("--route is required (e.g. 'UB3LYP/def2SVP')")
     if a.from_candidates:
         run_batch(a.from_candidates, a.route, a.workdir, a.g16, a.nproc, a.mem, a.every,
-                  a.out, a.dry_run, a.reuse_only)
+                  a.out, a.dry_run, a.reuse_only, a.m2_window, a.eligible_out, not a.no_guess_read)
     else:
         if not (a.scan_dir and a.tag and a.base_mult and a.alt_mult):
             ap.error("provide --from-candidates, or --scan-dir --tag --base-mult --alt-mult")
         run(a.scan_dir, a.tag, a.charge, a.base_mult, a.alt_mult, a.route, a.workdir, a.g16,
-            a.nproc, a.mem, a.every, a.out, a.dry_run, reuse_only=a.reuse_only)
+            a.nproc, a.mem, a.every, a.out, a.dry_run, reuse_only=a.reuse_only, m2_window=a.m2_window,
+            guess_read=not a.no_guess_read)
 
 
 if __name__ == "__main__":

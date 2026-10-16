@@ -17,3 +17,7 @@ At B3PW91* (15 % exact exchange)/def2-TZVP the axial seed gives +1.57 kcal/mol, 
 equatorial seed converges instead to the ³/¹ crossing within Fe(CO)4 (+10.2 kcal/mol).
 Literature: Cs MECP 0.43 kcal/mol above ³Fe(CO)4 + CO (J. N. Harvey and M. Aschi,
 Faraday Discuss. 124 (2003): 129, 10.1039/b211871h). Energies are electronic, without ZPE.
+
+Note (0.2.1): the equatorial seed (minimum DFT gap 47.53 kcal/mol, no crossing) does not pass the M2 rule
+(DFT curves cross, or minimum DFT gap <= 30 kcal/mol; `--m2-window`), so `run.sh` now passes only the axial seed to M2.
+The archived equatorial M2 run (128 steps, converged) is a sensitivity check, not part of the default workflow.
