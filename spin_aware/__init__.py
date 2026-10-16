@@ -19,4 +19,4 @@ CO loss, examples/feco5_co_loss/).
 """
 __all__ = ["amk_xtb","spin_enumerate","dissociation_scan","dissociation_seed_dft","locate_mecp","mecp_graph",
            "na_tst","microkinetics","annotate_rates"]
-__version__ = "0.2.0"
+__version__ = "1.1.0"

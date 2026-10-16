@@ -13,21 +13,19 @@ authors:
 license: MIT
 repository-code: "https://github.com/joshazerty/AutoMeKin"
 url: "https://github.com/joshazerty/AutoMeKin/tree/spin-aware-release"
-version: "1.0.0"
-date-released: "2026-09-08"
-# Uncomment and fill once the Zenodo deposit is published; leaving the key out is valid CFF,
-# leaving it in with placeholder text is not.
-# doi: "10.5281/zenodo.NNNNNNN"
+version: "1.1.0"
+date-released: "2026-10-16"
+doi: "10.5281/zenodo.23370373"
 preferred-citation:
   type: article
-  title: "Spin-Resolved Reaction-Network Exploration in AutoMeKin: Automatic Minimum-Energy-Crossing-Point Localisation and a Multireference Diagnostic Gate"
+  title: "Spin-Resolved Reaction-Network Exploration in AutoMeKin with Minimum-Energy-Crossing-Point Localization and an ⟨S2⟩ Single-Reference Check"
   authors:
     - given-names: Joshua
       family-names: Sims
       orcid: "https://orcid.org/0000-0002-8279-3010"
   year: 2026
   journal: "J. Comput. Chem."
-  notes: "Submitted. Update volume, pages and DOI on acceptance."
+  notes: "Under revision. Update volume, pages and DOI on acceptance."
 references:
   - type: software
     title: "AutoMeKin"

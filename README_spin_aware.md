@@ -34,16 +34,23 @@ python -m spin_aware.dissociation_scan min.xyz --charge 0 --mult 1 --outdir dsca
        --out mecp_candidates_dissoc.json
 # 2. DFT single points on each surface's scan frames; seed at the DFT crossing
 python -m spin_aware.dissociation_seed_dft --from-candidates mecp_candidates_dissoc.json \
-       --route "UB3LYP/def2SVP" --workdir dft_seed --out mecp_candidates_dissoc_dft.json
-# 3. M2, unchanged
-python -m spin_aware.locate_mecp --from-candidates mecp_candidates_dissoc_dft.json \
+       --route "UB3LYP/def2SVP" --workdir dft_seed --out mecp_candidates_dissoc_dft.json \
+       --eligible-out mecp_candidates_dissoc_m2.json
+# 3. M2 on the seeds whose DFT curves cross or whose smallest DFT gap is <= 30 kcal/mol
+python -m spin_aware.locate_mecp --from-candidates mecp_candidates_dissoc_m2.json \
        --method UB3LYP --basis def2SVP --extra-route "Int=UltraFine SCF=(XQC,MaxCycle=300)" \
-       --nproc 12 --mem 12GB --max-steps 150 --workdir m2
+       --nproc 12 --mem 12GB --max-steps 300 --workdir m2
 ```
 
 Step 2 is needed whenever GFN2 can misorder the spin states of the unsaturated
 fragment. For Fe(CO)₄, GFN2 puts the singlet below the triplet, so the GFN2 curves never
 cross while the DFT curves do. Pass the step-2 output to M2, not the step-1 GFN2 seeds.
+
+Each M2 run writes `mecp_record.json` with `status` = `converged` (all five easyMECP
+criteria met), `located` (the search stopped with final |ΔE| ≤ `--located-tol`, default
+0.5 kcal/mol: a point on the crossing seam, whose energy is an upper bound to the MECP
+energy) or `not_converged`, together with the final criteria, the step count and any
+easyMECP error message.
 Worked case: `examples/feco5_co_loss/`.
 
 Each module runs standalone (`python -m spin_aware.<module> --help`) and carries a

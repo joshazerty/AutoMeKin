@@ -7,11 +7,14 @@ upstream exploration core is unmodified; all additions are new files.
 ## New files
 - `spin_aware/amk_xtb.py` — spin-capable GFN2-xTB engine (multiplicity → `--uhf`).
 - `spin_aware/spin_enumerate.py` — M0 ⟨S²⟩ self-gate + M1 crossing detection.
+- `spin_aware/dissociation_scan.py` — M1 relaxed GFN2-xTB metal–ligand scans per multiplicity (ligand-loss channels; η² ligands along the metal–midpoint distance).
+- `spin_aware/dissociation_seed_dft.py` — M1 DFT single points on the scan frames; M2 seed at the DFT crossing or smallest gap.
 - `spin_aware/locate_mecp.py` — M2 MECP localisation (easyMECP/Gaussian).
 - `spin_aware/mecp_graph.py` — M3 MECP graph-node insertion.
 - `spin_aware/na_tst.py` — M4 nonadiabatic TST rate core.
 - `spin_aware/microkinetics.py` — M4 route-aware microkinetics.
 - `spin_aware/annotate_rates.py` — M4 rate annotation onto the M3 graph.
+- `m0_gate.py` — standalone M0 ⟨S²⟩ pass/flag rule on archived DFT logs.
 - `environment.yml` — reproducible conda environment.
 - `README_spin_aware.md` — pipeline overview and validation cases.
 

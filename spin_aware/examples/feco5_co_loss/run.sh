@@ -11,4 +11,4 @@ python -m spin_aware.dissociation_seed_dft --from-candidates mecp_candidates_dis
 # M2 runs only on seeds whose DFT curves cross or whose minimum DFT gap is <= 30 kcal/mol
 python -m spin_aware.locate_mecp --from-candidates mecp_candidates_dissoc_m2.json \
        --method UB3LYP --basis def2SVP --extra-route "Int=UltraFine SCF=(XQC,MaxCycle=300)" \
-       --nproc 12 --mem 12GB --max-steps 150 --easymecp easymecp --gaussian-exe g16 --workdir m2
+       --nproc 12 --mem 12GB --max-steps 300 --easymecp easymecp --gaussian-exe g16 --workdir m2

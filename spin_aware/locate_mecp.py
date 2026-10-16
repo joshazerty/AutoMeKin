@@ -49,6 +49,7 @@ PERIODIC = {  # minimal Z->symbol for writing geometries (extend as needed)
     26: "Fe", 27: "Co", 28: "Ni",
 }
 HARTREE_KCAL = 627.5094740631
+LOCATED_TOL_KCAL = 0.5   # Harvey & Aschi, Faraday Discuss. 2003, 124, 129: conservative MECP-energy error
 
 
 # --------------------------------------------------------------------------- #
@@ -66,7 +67,7 @@ def read_xyz(path):
 
 
 def generate_gjf(geom_rows, charge, mult_a, mult_b, method="UB3LYP", basis="def2SVP",
-                 mem="16GB", nproc=8, max_steps=80, extra_route="", out="system.gjf"):
+                 mem="16GB", nproc=8, max_steps=300, extra_route="", out="system.gjf"):
     """Write the easyMECP single-file input. Divergent values use {A,B} braces."""
     route = f"#n {method}/{basis} force guess(read)"
     if extra_route:
@@ -212,16 +213,74 @@ def collect_result(workdir):
     if os.path.isfile(rep):
         res["report_tail"] = "".join(open(rep, errors="ignore").readlines()[-15:])
         low = res["report_tail"].lower()
-        res["converged"] = ("converged" in low) or ("mecp" in low and "found" in low)
+        res["converged"] = ("has converged" in low) or ("mecp" in low and "found" in low)
+        crit = parse_report_criteria(rep)
+        res["criteria"] = crit
+        res["n_steps"] = crit.pop("_n_steps", None)
+        if crit and all(c["met"] for c in crit.values()):
+            res["converged"] = True
     return res
+
+
+CRITERIA = ("Max Gradient El.", "RMS Gradient El.", "Max Change of X", "RMS Change of X",
+            "Difference in E")
+_CRIT_RE = re.compile(r"^\s*(Max Gradient El\.|RMS Gradient El\.|Max Change of X|RMS Change of X|"
+                      r"Difference in E):\s+(\S+)\s+\((\S+)\)\s+(YES|NO)")
+
+
+def parse_report_criteria(report_path):
+    """Last value of each easyMECP convergence criterion in ReportFile.
+
+    Returns {name: {"value": float, "threshold": float, "met": bool}} plus "_n_steps"
+    (number of 'Geometry at Step' blocks). Values are in easyMECP units (Eh, Eh/bohr, bohr)."""
+    out, n = {}, 0
+    with open(report_path, errors="ignore") as fh:
+        for line in fh:
+            if line.startswith("Geometry at Step"):
+                n += 1
+                continue
+            m = _CRIT_RE.match(line)
+            if m:
+                try:
+                    out[m.group(1)] = {"value": float(m.group(2)), "threshold": float(m.group(3)),
+                                       "met": m.group(4) == "YES"}
+                except ValueError:
+                    pass
+    out["_n_steps"] = n or None
+    return out
+
+
+def easymecp_error(out_path):
+    """First error line easyMECP wrote to easymecp.out (e.g. 'MECP returned code 2'), else None."""
+    if not os.path.isfile(out_path):
+        return None
+    for line in open(out_path, errors="ignore"):
+        if "Error during MECP execution" in line or "returned code" in line:
+            return line.strip().lstrip("!").strip()
+    return None
+
+
+def classify(res, located_tol_kcal=LOCATED_TOL_KCAL):
+    """'converged' (all five easyMECP criteria met), 'located' (search stopped, final |dE| at or
+    below located_tol_kcal: a point on the crossing seam, not its minimum; its energy is an upper
+    bound to the MECP energy) or 'not_converged'."""
+    if res.get("converged"):
+        return "converged"
+    de = (res.get("criteria") or {}).get("Difference in E")
+    if de is not None:
+        res["final_de_kcal"] = round(abs(de["value"]) * HARTREE_KCAL, 4)
+        if res["final_de_kcal"] <= located_tol_kcal:
+            return "located"
+    return "not_converged"
 
 
 # --------------------------------------------------------------------------- #
 # run flow
 # --------------------------------------------------------------------------- #
 def locate_one(geom_xyz, charge, mult_a, mult_b, workdir, easymecp="easymecp.py",
-               gaussian_exe="g16", method="UB3LYP", basis="def2SVP", max_steps=80,
-               mem="16GB", nproc=8, extra_route="", dry_run=False):
+               gaussian_exe="g16", method="UB3LYP", basis="def2SVP", max_steps=300,
+               mem="16GB", nproc=8, extra_route="", dry_run=False,
+               located_tol_kcal=LOCATED_TOL_KCAL):
     os.makedirs(workdir, exist_ok=True)
     rows = read_xyz(geom_xyz)
     gjf = generate_gjf(rows, charge, mult_a, mult_b, method, basis, mem, nproc, max_steps,
@@ -237,7 +296,14 @@ def locate_one(geom_xyz, charge, mult_a, mult_b, workdir, easymecp="easymecp.py"
     with open(os.path.join(workdir, "easymecp.out"), "w") as out:
         p = subprocess.run(cmd, cwd=workdir, stdout=out, stderr=subprocess.STDOUT)
     record["returncode"] = p.returncode
+    record["max_steps"] = max_steps
     record.update(collect_result(workdir))
+    record["easymecp_error"] = easymecp_error(os.path.join(workdir, "easymecp.out"))
+    de = (record.get("criteria") or {}).get("Difference in E")
+    if de is not None:
+        record["final_de_kcal"] = round(abs(de["value"]) * HARTREE_KCAL, 4)
+    record["located_tol_kcal"] = located_tol_kcal
+    record["status"] = classify(record, located_tol_kcal)
     with open(os.path.join(workdir, "mecp_record.json"), "w") as fh:
         json.dump(record, fh, indent=2)
     return record
@@ -256,7 +322,11 @@ def main():
     sub("--gaussian-exe", default="g16")
     sub("--method", default="UB3LYP")
     sub("--basis", default="def2SVP")
-    sub("--max-steps", type=int, default=80)
+    sub("--max-steps", type=int, default=300,
+        help="easyMECP step limit (default 300; one limit for every search)")
+    sub("--located-tol", type=float, default=LOCATED_TOL_KCAL,
+        help="kcal/mol; a search that stops without meeting every easyMECP criterion is labelled "
+             "'located' if its final |dE| is at or below this value (default 0.5)")
     sub("--nproc", type=int, default=8, help="nproc written into system.gjf (used by every easyMECP step)")
     sub("--mem", default="16GB", help="mem written into system.gjf")
     sub("--extra-route", default="", help="extra Gaussian route keywords (e.g. 'Int=UltraFine SCF=(XQC,MaxCycle=300)')")
@@ -282,10 +352,11 @@ def main():
         rec = locate_one(easymecp=args.easymecp, gaussian_exe=args.gaussian_exe,
                          method=args.method, basis=args.basis, max_steps=args.max_steps,
                          mem=args.mem, nproc=args.nproc,
-                         extra_route=args.extra_route, dry_run=args.dry_run, **r)
+                         extra_route=args.extra_route, dry_run=args.dry_run,
+                         located_tol_kcal=args.located_tol, **r)
         print(json.dumps({k: rec.get(k) for k in
-                          ("workdir", "returncode", "converged", "gap_kcal",
-                           "crossing_e_eh", "n_geom_atoms")}, indent=2))
+                          ("workdir", "returncode", "status", "converged", "n_steps", "final_de_kcal",
+                           "gap_kcal", "crossing_e_eh", "n_geom_atoms", "easymecp_error")}, indent=2))
 
 
 def _selftest():
@@ -319,8 +390,23 @@ def _selftest():
         res = collect_result(w)
         assert res["n_geom_atoms"] == 2 and abs(res["e_surface_a"] + 1.3) < 1e-9
         assert read_xyz(os.path.join(w, "mecp.xyz"))[1][3] == 2.3
+        # 5) ReportFile criteria, step count and the three-label status
+        open(os.path.join(w, "ReportFile"), "w").write(
+            "Geometry at Step1\nMax Gradient El.:   0.011379 (0.000700)   NO\n"
+            "RMS Gradient El.:   0.003673 (0.000500)   NO\nMax Change of X:    0.060627 (0.004000)   NO\n"
+            "RMS Change of X:    0.015097 (0.002500)   NO\nDifference in E:    0.000029 (0.000050)  YES\n"
+            "Geometry at Step2\n")
+        res = collect_result(w)
+        assert res["n_steps"] == 2 and res["criteria"]["Difference in E"]["met"]
+        assert classify(res) == "located" and abs(res["final_de_kcal"] - 0.0182) < 1e-3
+        assert classify(dict(res, final_de_kcal=None,
+                             criteria={"Difference in E": {"value": 0.0029, "threshold": 5e-5, "met": False}})) == "not_converged"
+        assert classify({"converged": True}) == "converged"
+        open(os.path.join(w, "easymecp.out"), "w").write(
+            "x\n  ! Error during MECP execution: SubprocessError -> MECP returned code 2\n")
+        assert easymecp_error(os.path.join(w, "easymecp.out")).endswith("MECP returned code 2")
     print("M2 selftest PASS: gjf generation, SCF parse, geom(Z->sym) read, "
-          "final-step log selection, trajectory fallback all OK")
+          "final-step log selection, trajectory fallback, criteria/status labels, error capture all OK")
     return 0
 
 

@@ -1,4 +1,16 @@
-## spin_aware 0.2.0 (unreleased; manuscript revision)
+## spin_aware 1.1.0 (tag v1.1.0, 10/16/2026; manuscript revision)
+
+The package version now follows the repository tag. Includes everything listed under 0.2.0 below.
+
+| Date | Changes |
+| ---------- | ----------|
+|10/16/2026| <code>locate_mecp.py</code>: default <code>--max-steps</code> raised from 80 to 300, the single step limit used for every MECP search of the revised paper. <code>mecp_record.json</code> now records <code>max_steps</code>, the step count, the final value/threshold/met flag of the five easyMECP criteria, <code>final_de_kcal</code>, any easyMECP error message (previously a step that failed with "MECP returned code 2" was reported as returncode 0) and a <code>status</code> label: <code>converged</code> (all five criteria met), <code>located</code> (final \|ΔE\| ≤ <code>--located-tol</code>, default 0.5 kcal/mol, the conservative MECP-energy error of Harvey and Aschi, Faraday Discuss. 2003, 124, 129) or <code>not_converged</code>. The convergence test now matches easyMECP's "has CONVERGED" message instead of any occurrence of "converged".|
+|10/16/2026| <code>dissociation_scan.py</code>: X-type (homolysis) bonds are skipped by default (<code>--include-x</code> keeps them) and listed; η² ligands are scanned along the metal–midpoint distance; <code>--emax</code> restricts the scan to minima within a window of the lowest minimum (20 kcal/mol in the paper). <code>dissociation_seed_dft.py</code>: <code>Guess=Read</code> along each surface, and the M2 rule (DFT curves cross or smallest DFT gap ≤ 30 kcal/mol) written to <code>--eligible-out</code>. This is the code used for the 20 kcal/mol ligand-loss campaign.|
+|10/16/2026| <code>mecp_graph.py</code>: reads native AutoMeKin RXNet files including PR product lines and optional MINinfo, de-duplicates MECP records (permutation-aware RMSD &lt; 0.3 Å and \|ΔE\| &lt; 0.5 kcal/mol), new options <code>--perm-match</code> and <code>--partner-role</code>. The Tp-Fe example graph is reproduced unchanged.|
+|10/16/2026| <code>m0_gate.py</code>: CLI options <code>--pass-tol</code>, <code>--flag-tol</code> and <code>--min-flag</code> (defaults unchanged: 0.5, 1.0, 2), so the thresholds can be varied without editing the code. All verdicts reported in the paper are unchanged.|
+|10/16/2026| <code>examples/feco5_co_loss/run.sh</code> and <code>README_spin_aware.md</code>: M2 runs on the <code>--eligible-out</code> seeds with 300 steps.|
+
+## spin_aware 0.2.0 (merged into 1.1.0)
 
 | Date | Changes |
 | ---------- | ----------|
