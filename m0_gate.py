@@ -22,6 +22,10 @@ refused state sits >= 2.5 above ideal with annihilation raising.
 Usage:
   python m0_gate.py --mult 3 triplet_ub3lyp.log triplet_opbe.log triplet_tpssh.log
   python m0_gate.py --mult 3 --json gate_verdict.json logs/*.log
+  python m0_gate.py --mult 3 --pass-tol 0.1 --flag-tol 1.0 --min-flag 2 logs/*.log
+
+The three thresholds default to the values below and can be overridden with
+--pass-tol, --flag-tol and --min-flag; the values used are written to the JSON record.
 """
 import argparse
 import json
@@ -45,18 +49,18 @@ def parse_annihilation(path):
     return before, after
 
 
-def classify(before, after, ideal):
+def classify(before, after, ideal, pass_tol=PASS_TOL, flag_tol=FLAG_TOL):
     """Per-functional verdict: PASS / FLAG / REVIEW."""
     dev_after = abs(after - ideal)
     lowers = abs(after - ideal) < abs(before - ideal)
-    if lowers and dev_after <= PASS_TOL:
+    if lowers and dev_after <= pass_tol:
         return "PASS"
-    if (not lowers) or dev_after >= FLAG_TOL:
+    if (not lowers) or dev_after >= flag_tol:
         return "FLAG"
     return "REVIEW"
 
 
-def gate(paths, mult):
+def gate(paths, mult, pass_tol=PASS_TOL, flag_tol=FLAG_TOL, min_flag=MIN_FLAG):
     spin = (mult - 1) / 2.0
     ideal = spin * (spin + 1.0)
     rows = []
@@ -67,18 +71,18 @@ def gate(paths, mult):
             "ideal": ideal, "dev_after": round(abs(after - ideal), 4),
             "annihilation": "lowers" if abs(after - ideal) < abs(before - ideal)
                             else "raises",
-            "verdict": classify(before, after, ideal),
+            "verdict": classify(before, after, ideal, pass_tol, flag_tol),
         })
     n_flag = sum(r["verdict"] == "FLAG" for r in rows)
-    if n_flag >= MIN_FLAG:
+    if n_flag >= min_flag:
         overall = "FLAG (multireference — single-determinant machinery withheld)"
     elif all(r["verdict"] == "PASS" for r in rows):
         overall = "PASS (single-reference-clean)"
     else:
         overall = "REVIEW (mixed signals — operator decision required)"
     return {"multiplicity": mult, "ideal_s2": ideal,
-            "thresholds": {"pass_tol": PASS_TOL, "flag_tol": FLAG_TOL,
-                           "min_flag_functionals": MIN_FLAG},
+            "thresholds": {"pass_tol": pass_tol, "flag_tol": flag_tol,
+                           "min_flag_functionals": min_flag},
             "functionals": rows, "overall": overall}
 
 
@@ -88,10 +92,22 @@ def main(argv=None):
                     help="unrestricted-DFT logs, one per functional")
     ap.add_argument("--mult", type=int, required=True,
                     help="spin multiplicity 2S+1 of the state under test")
+    ap.add_argument("--pass-tol", type=float, default=PASS_TOL,
+                    help="max |<S**2>_ann - S(S+1)| for a per-functional PASS "
+                         "(default %(default)s)")
+    ap.add_argument("--flag-tol", type=float, default=FLAG_TOL,
+                    help="|<S**2>_ann - S(S+1)| at/above which a functional FLAGs "
+                         "(default %(default)s)")
+    ap.add_argument("--min-flag", type=int, default=MIN_FLAG,
+                    help="functionals that must FLAG for an aggregate FLAG "
+                         "(default %(default)s)")
     ap.add_argument("--json", metavar="FILE",
                     help="also write the verdict record as JSON")
     args = ap.parse_args(argv)
-    result = gate(args.logs, args.mult)
+    if args.pass_tol > args.flag_tol:
+        ap.error("--pass-tol must not exceed --flag-tol")
+    result = gate(args.logs, args.mult, args.pass_tol, args.flag_tol,
+                  args.min_flag)
     for r in result["functionals"]:
         print(f"{r['log']}: <S**2> {r['s2_before']:.4f} -> {r['s2_after']:.4f} "
               f"(ideal {r['ideal']:.2f}, dev {r['dev_after']:.4f}, "
